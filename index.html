@@ -51,9 +51,9 @@
               <p class="text-xs text-slate-500 hidden sm:block">인스타그램 매거진 1·2팀 통합 일정 관리 시스템</p>
             </div>
           </div>
-          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
-            실시간 연동 중
+          <span id="syncStatus" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5 animate-pulse"></span>
+            연동 중...
           </span>
         </div>
 
@@ -260,9 +260,9 @@
   <!-- FIREBASE APPLICATION LOGIC -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // 💡 사용자 지정 Firebase 설정 적용 완료
+    // Firebase Configuration
     const firebaseConfig = {
       apiKey: "AIzaSyC1nPVP5JFGGZgecqYXwNG_EBW-Rzm1f3A",
       authDomain: "frontoffice-f0527.firebaseapp.com",
@@ -284,21 +284,7 @@
     let currentFormatFilter = 'all';
     let currentView = 'calendar';
     let pendingDeleteId = null;
-
-    // Local Storage Backup Fallback
-    const LOCAL_KEY = 'front_office_scheduler_backup';
-
-    function getBackupData() {
-      try {
-        return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]');
-      } catch (e) {
-        return [];
-      }
-    }
-
-    function saveBackupData(data) {
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
-    }
+    let firebaseConnected = false;
 
     // Initialize App & Firestore Real-time Listener
     function initApp() {
@@ -307,21 +293,44 @@
 
       // Setup Realtime Firestore Listener
       try {
-        onSnapshot(eventsCol, (snapshot) => {
+        const q = query(eventsCol);
+        
+        const unsubscribe = onSnapshot(q, (snapshot) => {
           events = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           }));
-          saveBackupData(events);
+          firebaseConnected = true;
+          updateSyncStatus(true);
           render();
+          console.log("✅ Firestore 연동 성공:", events.length + "개 일정");
         }, (error) => {
-          console.warn("Firestore 접근 문제 발생, 로컬 스토리지로 모드 전환:", error);
-          events = getBackupData();
+          firebaseConnected = false;
+          updateSyncStatus(false);
+          console.error("❌ Firestore 오류:", error.message);
+          showToast("Firebase 연결 실패. 로컬 모드로 작동합니다.", "warning");
           render();
         });
+
+        // 페이지 나갈 때 리스너 정리
+        window.addEventListener('beforeunload', () => {
+          unsubscribe();
+        });
       } catch (e) {
-        events = getBackupData();
-        render();
+        firebaseConnected = false;
+        updateSyncStatus(false);
+        console.error("Firebase 초기화 오류:", e);
+      }
+    }
+
+    function updateSyncStatus(isConnected) {
+      const statusEl = document.getElementById('syncStatus');
+      if (isConnected) {
+        statusEl.className = 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200';
+        statusEl.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>실시간 연동 중';
+      } else {
+        statusEl.className = 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200';
+        statusEl.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5"></span>로컬 모드';
       }
     }
 
@@ -581,29 +590,26 @@
           team: document.getElementById('eventTeam').value,
           format: document.getElementById('eventFormat').value,
           date: document.getElementById('eventDate').value,
-          memo: document.getElementById('eventMemo').value
+          memo: document.getElementById('eventMemo').value,
+          createdAt: new Date().toISOString()
         };
 
         if (id) {
           try {
             await updateDoc(doc(db, "front_office_events", id), eventData);
+            showToast('일정이 수정되었습니다.');
           } catch (err) {
-            const idx = events.findIndex(item => item.id === id);
-            if (idx !== -1) events[idx] = { id, ...eventData };
-            saveBackupData(events);
-            render();
+            console.error("수정 오류:", err);
+            showToast('오류: ' + err.message, "warning");
           }
-          showToast('일정이 수정되었습니다.');
         } else {
           try {
             await addDoc(eventsCol, eventData);
+            showToast('새 일정이 등록되었습니다.');
           } catch (err) {
-            const newEv = { id: 'local_' + Date.now(), ...eventData };
-            events.push(newEv);
-            saveBackupData(events);
-            render();
+            console.error("추가 오류:", err);
+            showToast('오류: ' + err.message, "warning");
           }
-          showToast('새 일정이 등록되었습니다.');
         }
 
         closeModal();
@@ -628,12 +634,11 @@
         if (pendingDeleteId) {
           try {
             await deleteDoc(doc(db, "front_office_events", pendingDeleteId));
+            showToast('일정이 삭제되었습니다.');
           } catch (err) {
-            events = events.filter(item => item.id !== pendingDeleteId);
-            saveBackupData(events);
-            render();
+            console.error("삭제 오류:", err);
+            showToast('오류: ' + err.message, "warning");
           }
-          showToast('일정이 삭제되었습니다.');
         }
         deleteModal.classList.add('hidden');
         pendingDeleteId = null;
@@ -744,13 +749,13 @@
       document.getElementById('deleteConfirmModal').classList.remove('hidden');
     }
 
-    function showToast(msg) {
+    function showToast(msg, type = 'success') {
       const toast = document.getElementById('toast');
       document.getElementById('toastMsg').textContent = msg;
       toast.classList.remove('opacity-0', 'pointer-events-none');
       setTimeout(() => {
         toast.classList.add('opacity-0', 'pointer-events-none');
-      }, 2500);
+      }, 3000);
     }
 
     // App Init
