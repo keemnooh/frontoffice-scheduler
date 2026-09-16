@@ -1,755 +1,760 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>프런트오피스 스케쥴러 - 실시간 일정 공유</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts (Noto Sans KR & Inter) -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        team1: {
-                            light: '#e0e7ff',
-                            DEFAULT: '#4f46e5',
-                            dark: '#3730a3',
-                            bg: '#eef2ff',
-                            border: '#c7d2fe'
-                        },
-                        team2: {
-                            light: '#ccfbf1',
-                            DEFAULT: '#0d9488',
-                            dark: '#115e59',
-                            bg: '#f0fdf4',
-                            border: '#99f6e4'
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Noto Sans KR', 'Inter', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8fafc; }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        /* Pulse for online live indicator */
-        @keyframes pulse-ring {
-            0% { transform: scale(0.95); opacity: 0.8; }
-            50% { transform: scale(1.1); opacity: 0.4; }
-            100% { transform: scale(0.95); opacity: 0.8; }
-        }
-        .live-dot { animation: pulse-ring 2s infinite ease-in-out; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>프런트오피스 스케쥴러</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts (Noto Sans KR) -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col selection:bg-indigo-100 selection:text-indigo-800">
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white pb-10">
 
-    <!-- Navigation Header -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16 items-center">
-                <!-- Title & Brand -->
-                <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center text-white font-bold shadow-md shrink-0">
-                        <i class="fa-solid fa-newspaper text-lg"></i>
-                    </div>
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <h1 class="text-base sm:text-xl font-bold text-slate-900 leading-tight">프런트오피스 스케쥴러</h1>
-                            <span id="syncBadge" class="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                <span class="w-2 h-2 rounded-full bg-emerald-500 live-dot"></span> 실시간 연동 중
-                            </span>
-                        </div>
-                        <p class="text-xs text-slate-500 hidden sm:block">인스타그램 매거진 기획 & 릴스 콘텐츠 교차 일정 관리</p>
-                    </div>
-                </div>
-
-                <!-- Team Info Badges & Action Buttons -->
-                <div class="flex items-center space-x-2 sm:space-x-3">
-                    <div class="hidden lg:flex items-center space-x-2 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-lg">
-                        <span class="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                        <span class="text-xs font-semibold text-indigo-900">1팀: 박지훈</span>
-                    </div>
-                    <div class="hidden lg:flex items-center space-x-2 bg-teal-50 border border-teal-100 px-3 py-1.5 rounded-lg">
-                        <span class="w-2.5 h-2.5 rounded-full bg-teal-600"></span>
-                        <span class="text-xs font-semibold text-teal-900">2팀: 김정훈</span>
-                    </div>
-
-                    <!-- Share Link Button -->
-                    <button onclick="shareLink()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold px-3 py-2 rounded-xl transition flex items-center gap-1.5 border border-slate-200" title="팀원 공유 링크 복사">
-                        <i class="fa-solid fa-share-nodes text-indigo-600"></i>
-                        <span class="hidden xs:inline">공유하기</span>
-                    </button>
-
-                    <!-- Add Event Button -->
-                    <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-plus text-xs"></i>
-                        <span>새 일정</span>
-                    </button>
-                </div>
+  <!-- TOP HEADER -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 sm:py-0 sm:h-16 gap-3 sm:gap-0">
+        <!-- Title & Status -->
+        <div class="flex items-center justify-between sm:justify-start space-x-3">
+          <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-pink-500 flex items-center justify-center text-white font-bold shadow-md shadow-indigo-100">
+              <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
             </div>
-        </div>
-    </header>
-
-    <!-- Global Toast Notification Container -->
-    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
-
-    <!-- Main Content Container -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-
-        <!-- Banner for Conflict Warning Summary -->
-        <div id="conflictAlertBanner" class="hidden mb-4 sm:mb-6 bg-amber-50 border-l-4 border-amber-500 p-3.5 sm:p-4 rounded-r-xl shadow-sm flex items-start space-x-3">
-            <i class="fa-solid fa-triangle-exclamation text-amber-500 text-lg sm:text-xl mt-0.5 shrink-0"></i>
-            <div class="flex-1">
-                <h3 class="text-xs sm:text-sm font-bold text-amber-800">동일 날짜 발행 일정이 존재합니다!</h3>
-                <p class="text-[11px] sm:text-xs text-amber-700 mt-0.5" id="conflictAlertText">1팀과 2팀의 기획/릴스 콘텐츠 발행 일정이 같은 날에 배치되어 있습니다.</p>
+            <div>
+              <h1 class="text-lg sm:text-xl font-bold bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-800 bg-clip-text text-transparent">
+                프런트오피스 스케쥴러
+              </h1>
+              <p class="text-xs text-slate-500 hidden sm:block">인스타그램 매거진 1·2팀 통합 일정 관리 시스템</p>
             </div>
+          </div>
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+            실시간 연동 중
+          </span>
         </div>
 
-        <!-- Filter and View Switching Controls -->
-        <div class="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-sm mb-4 sm:mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
-            
-            <!-- Controls Group Left -->
-            <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-                <!-- Date Selector Navigation -->
-                <div class="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl">
-                    <button onclick="changeMonth(-1)" class="p-1.5 hover:bg-white rounded-lg text-slate-600 transition"><i class="fa-solid fa-chevron-left text-xs"></i></button>
-                    <span id="currentMonthLabel" class="text-xs sm:text-sm font-bold text-slate-800 px-2 sm:px-3 min-w-[90px] text-center">2026년 9월</span>
-                    <button onclick="changeMonth(1)" class="p-1.5 hover:bg-white rounded-lg text-slate-600 transition"><i class="fa-solid fa-chevron-right text-xs"></i></button>
-                </div>
-
-                <!-- Team Filter -->
-                <div class="flex items-center space-x-1 border-l border-slate-200 pl-2 sm:pl-3">
-                    <span class="text-xs font-medium text-slate-500 mr-1 hidden xs:inline">팀:</span>
-                    <button onclick="setTeamFilter('ALL')" id="filterTeamAll" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 text-white transition">전체</button>
-                    <button onclick="setTeamFilter('TEAM1')" id="filterTeam1" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition">1팀</button>
-                    <button onclick="setTeamFilter('TEAM2')" id="filterTeam2" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-600 hover:bg-teal-50 hover:text-teal-600 transition">2팀</button>
-                </div>
-
-                <!-- Format Filter -->
-                <div class="flex items-center space-x-1 border-l border-slate-200 pl-2 sm:pl-3">
-                    <span class="text-xs font-medium text-slate-500 mr-1 hidden xs:inline">포맷:</span>
-                    <select id="formatFilter" onchange="applyFilters()" class="text-xs font-semibold border border-slate-300 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        <option value="ALL">전체 포맷</option>
-                        <option value="기획 콘텐츠">기획 콘텐츠</option>
-                        <option value="릴스 콘텐츠">릴스 콘텐츠</option>
-                    </select>
-                </div>
+        <!-- Team Leads Info & Action Buttons -->
+        <div class="flex items-center justify-between sm:justify-end space-x-3">
+          <div class="hidden md:flex items-center space-x-2 bg-slate-100 p-1.5 rounded-lg border border-slate-200/60 text-xs font-medium text-slate-600">
+            <div class="flex items-center space-x-1.5 bg-white px-2.5 py-1 rounded shadow-xs">
+              <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+              <span>1팀: <strong class="text-slate-800">박지훈</strong></span>
             </div>
-
-            <!-- Controls Group Right (View Mode Toggle & Stats) -->
-            <div class="flex items-center justify-between lg:justify-end space-x-3 border-t lg:border-t-0 pt-2.5 lg:pt-0 border-slate-100">
-                <div class="text-xs text-slate-500 font-medium">
-                    총 <span id="totalCount" class="font-bold text-slate-900">0</span>개 콘텐츠
-                </div>
-                
-                <div class="flex bg-slate-100 p-1 rounded-xl">
-                    <button onclick="switchView('calendar')" id="btnViewCalendar" class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-white text-slate-800 shadow-sm transition">
-                        <i class="fa-regular fa-calendar-days"></i> 캘린더
-                    </button>
-                    <button onclick="switchView('list')" id="btnViewList" class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition">
-                        <i class="fa-solid fa-list-ul"></i> 목록
-                    </button>
-                </div>
+            <div class="flex items-center space-x-1.5 bg-white px-2.5 py-1 rounded shadow-xs">
+              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>2팀: <strong class="text-slate-800">김정훈</strong></span>
             </div>
+          </div>
+
+          <button id="shareBtn" class="inline-flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition">
+            <i data-lucide="share-2" class="w-3.5 h-3.5 text-slate-500"></i>
+            <span>공유하기</span>
+          </button>
+          <button id="openModalBtn" class="inline-flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 shadow-sm transition">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>일정 추가</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTROL BAR -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 sm:mt-6 flex-1 w-full">
+    <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs mb-6 space-y-4">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        
+        <!-- Month Navigation -->
+        <div class="flex items-center justify-between md:justify-start space-x-4">
+          <div class="flex items-center space-x-1">
+            <button id="prevMonth" class="p-2 rounded-lg hover:bg-slate-100 text-slate-600 active:bg-slate-200 transition">
+              <i data-lucide="chevron-left" class="w-5 h-5"></i>
+            </button>
+            <h2 id="currentMonthYear" class="text-lg font-bold text-slate-800 min-w-[120px] text-center">
+              2026년 9월
+            </h2>
+            <button id="nextMonth" class="p-2 rounded-lg hover:bg-slate-100 text-slate-600 active:bg-slate-200 transition">
+              <i data-lucide="chevron-right" class="w-5 h-5"></i>
+            </button>
+          </div>
+          <button id="todayBtn" class="px-2.5 py-1 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition">
+            오늘
+          </button>
         </div>
 
-        <!-- CALENDAR VIEW -->
-        <div id="calendarView" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <!-- Calendar Days Header -->
-            <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-xs font-bold text-slate-600 py-2.5">
-                <div class="text-rose-500">일</div>
-                <div>월</div>
-                <div>화</div>
-                <div>수</div>
-                <div>목</div>
-                <div>금</div>
-                <div class="text-indigo-500">토</div>
-            </div>
-            <!-- Dynamic Calendar Days Grid -->
-            <div id="calendarGrid" class="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-slate-100 min-h-[500px] sm:min-h-[650px]">
-                <!-- Rendered dynamically by JS -->
-            </div>
+        <!-- Filters & View Toggle -->
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Team Filter -->
+          <div class="flex bg-slate-100 p-1 rounded-lg text-xs font-medium text-slate-600">
+            <button class="filter-team-btn px-2.5 py-1 rounded-md transition font-semibold bg-white text-slate-800 shadow-xs" data-team="all">전체 팀</button>
+            <button class="filter-team-btn px-2.5 py-1 rounded-md transition hover:text-slate-900" data-team="1팀">1팀 (박지훈)</button>
+            <button class="filter-team-btn px-2.5 py-1 rounded-md transition hover:text-slate-900" data-team="2팀">2팀 (김정훈)</button>
+          </div>
+
+          <!-- Format Filter -->
+          <div class="flex bg-slate-100 p-1 rounded-lg text-xs font-medium text-slate-600">
+            <button class="filter-format-btn px-2.5 py-1 rounded-md transition font-semibold bg-white text-slate-800 shadow-xs" data-format="all">전체 포맷</button>
+            <button class="filter-format-btn px-2.5 py-1 rounded-md transition hover:text-slate-900" data-format="기획 콘텐츠">기획</button>
+            <button class="filter-format-btn px-2.5 py-1 rounded-md transition hover:text-slate-900" data-format="릴스 콘텐츠">릴스</button>
+          </div>
+
+          <!-- View Toggle -->
+          <div class="flex bg-slate-100 p-1 rounded-lg text-xs font-medium text-slate-600 ml-auto md:ml-0">
+            <button id="calendarViewBtn" class="view-btn px-2.5 py-1 rounded-md transition font-semibold bg-white text-slate-800 shadow-xs">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 inline mr-1"></i>달력
+            </button>
+            <button id="listViewBtn" class="view-btn px-2.5 py-1 rounded-md transition hover:text-slate-900">
+              <i data-lucide="list" class="w-3.5 h-3.5 inline mr-1"></i>타임라인
+            </button>
+          </div>
         </div>
 
-        <!-- LIST / TIMELINE VIEW -->
-        <div id="listView" class="hidden space-y-4">
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse min-w-[640px]">
-                        <thead>
-                            <tr class="bg-slate-50 text-slate-600 text-xs font-bold border-b border-slate-200">
-                                <th class="p-3.5">발행 일시</th>
-                                <th class="p-3.5">담당 팀</th>
-                                <th class="p-3.5">포맷 유형</th>
-                                <th class="p-3.5">콘텐츠 제목 / 주제</th>
-                                <th class="p-3.5">진행 상태</th>
-                                <th class="p-3.5">비고 및 링크</th>
-                                <th class="p-3.5 text-right">관리</th>
-                            </tr>
-                        </thead>
-                        <tbody id="listTableBody" class="divide-y divide-slate-100 text-xs sm:text-sm">
-                            <!-- Rendered dynamically by JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+      </div>
+
+      <!-- Conflict Alert Banner -->
+      <div id="conflictAlertBanner" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start space-x-3 text-xs text-amber-900">
+        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+        <div class="flex-1">
+          <strong class="font-semibold text-amber-800">일정 중복 감지:</strong>
+          <span id="conflictAlertText">이번 달에 1팀과 2팀의 발행 일정이 동일한 날짜에 상충하는 구역이 있습니다. 아래 달력에서 ⚠️ 표시를 확인하세요.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CALENDAR VIEW CONTAINER -->
+    <div id="calendarContainer" class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+      <!-- Weekday Header -->
+      <div class="calendar-grid border-b border-slate-200 bg-slate-50 text-center text-xs font-bold text-slate-500 py-2.5">
+        <div class="text-rose-500">일</div>
+        <div>월</div>
+        <div>화</div>
+        <div>수</div>
+        <div>목</div>
+        <div>금</div>
+        <div class="text-indigo-600">토</div>
+      </div>
+      <!-- Days Grid -->
+      <div id="calendarGrid" class="calendar-grid divide-x divide-y divide-slate-100">
+        <!-- JS Grid Rendered Here -->
+      </div>
+    </div>
+
+    <!-- LIST VIEW CONTAINER -->
+    <div id="listContainer" class="hidden bg-white rounded-2xl border border-slate-200 shadow-xs p-4 sm:p-6 space-y-4">
+      <h3 class="text-sm font-bold text-slate-800 flex items-center space-x-2">
+        <i data-lucide="clock" class="w-4 h-4 text-indigo-600"></i>
+        <span>월간 일정 타임라인</span>
+      </h3>
+      <div id="listTimeline" class="space-y-3 divide-y divide-slate-100">
+        <!-- JS List Rendered Here -->
+      </div>
+    </div>
+  </main>
+
+  <!-- ADD / EDIT EVENT MODAL -->
+  <div id="eventModal" class="fixed inset-0 z-50 hidden bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <h3 id="modalTitle" class="font-bold text-slate-800 text-base">새 콘텐츠 일정 추가</h3>
+        <button id="closeModalBtn" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      
+      <form id="eventForm" class="p-6 space-y-4">
+        <input type="hidden" id="eventId">
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">콘텐츠 제목</label>
+          <input type="text" id="eventTitle" required placeholder="예: [가을 특집] 20대 패션 트렌드 모음" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
         </div>
 
-    </main>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">담당 팀</label>
+            <select id="eventTeam" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+              <option value="1팀">1팀 (박지훈 팀장)</option>
+              <option value="2팀">2팀 (김정훈 팀장)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">포맷 유형</label>
+            <select id="eventFormat" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+              <option value="기획 콘텐츠">기획 콘텐츠</option>
+              <option value="릴스 콘텐츠">릴스 콘텐츠</option>
+            </select>
+          </div>
+        </div>
 
-    <!-- Modal for Adding/Editing Content Schedule -->
-    <div id="scheduleModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-100 transform transition-all">
-            <!-- Modal Header -->
-            <div class="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
-                <h3 id="modalTitle" class="text-base sm:text-lg font-bold">새 콘텐츠 일정 추가</h3>
-                <button onclick="closeModal()" class="text-slate-400 hover:text-white transition">
-                    <i class="fa-solid fa-xmark text-lg"></i>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">발행 예정일</label>
+          <input type="date" id="eventDate" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">상세 메모 (선택)</label>
+          <textarea id="eventMemo" rows="2" placeholder="참고사항, 레퍼런스 링크 등 기재" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"></textarea>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-between space-x-2">
+          <button type="button" id="deleteModalEventBtn" class="hidden px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold rounded-lg text-xs transition items-center space-x-1">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>일정 삭제</span>
+          </button>
+          <div class="flex items-center space-x-2 ml-auto">
+            <button type="button" id="cancelModalBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-lg text-xs transition">취소</button>
+            <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs shadow-sm transition">저장하기</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- DELETE CONFIRMATION MODAL -->
+  <div id="deleteConfirmModal" class="fixed inset-0 z-50 hidden bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-xs overflow-hidden text-center p-6 space-y-4">
+      <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
+        <i data-lucide="trash-2" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h4 class="text-base font-bold text-slate-800">일정을 삭제하시겠습니까?</h4>
+        <p class="text-xs text-slate-500 mt-1">삭제된 일정 데이터는 복구할 수 없습니다.</p>
+      </div>
+      <div class="flex items-center justify-center space-x-2">
+        <button id="cancelDeleteBtn" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs transition">취소</button>
+        <button id="confirmDeleteBtn" class="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg text-xs shadow-sm transition">삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg flex items-center space-x-2 text-xs opacity-0 transition-opacity duration-300 pointer-events-none">
+    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toastMsg">처리되었습니다.</span>
+  </div>
+
+  <!-- FIREBASE APPLICATION LOGIC -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // 💡 사용자 지정 Firebase 설정 적용 완료
+    const firebaseConfig = {
+      apiKey: "AIzaSyC1nPVP5JFGGZgecqYXwNG_EBW-Rzm1f3A",
+      authDomain: "frontoffice-f0527.firebaseapp.com",
+      projectId: "frontoffice-f0527",
+      storageBucket: "frontoffice-f0527.firebasestorage.app",
+      messagingSenderId: "103538813933",
+      appId: "1:103538813933:web:9e84a81f2b2a17245bd5e4",
+      measurementId: "G-9V1DSFJL3D"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const eventsCol = collection(db, "front_office_events");
+
+    // State Variables
+    let events = [];
+    let currentDate = new Date();
+    let currentTeamFilter = 'all';
+    let currentFormatFilter = 'all';
+    let currentView = 'calendar';
+    let pendingDeleteId = null;
+
+    // Local Storage Backup Fallback
+    const LOCAL_KEY = 'front_office_scheduler_backup';
+
+    function getBackupData() {
+      try {
+        return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]');
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveBackupData(data) {
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
+    }
+
+    // Initialize App & Firestore Real-time Listener
+    function initApp() {
+      lucide.createIcons();
+      setupEventListeners();
+
+      // Setup Realtime Firestore Listener
+      try {
+        onSnapshot(eventsCol, (snapshot) => {
+          events = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          saveBackupData(events);
+          render();
+        }, (error) => {
+          console.warn("Firestore 접근 문제 발생, 로컬 스토리지로 모드 전환:", error);
+          events = getBackupData();
+          render();
+        });
+      } catch (e) {
+        events = getBackupData();
+        render();
+      }
+    }
+
+    // UI Render Dispatcher
+    function render() {
+      updateHeaderMonth();
+      if (currentView === 'calendar') {
+        renderCalendar();
+      } else {
+        renderTimeline();
+      }
+      checkConflicts();
+      lucide.createIcons();
+    }
+
+    function updateHeaderMonth() {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      document.getElementById('currentMonthYear').textContent = `${year}년 ${month}월`;
+    }
+
+    // Render Calendar View
+    function renderCalendar() {
+      const grid = document.getElementById('calendarGrid');
+      grid.innerHTML = '';
+
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const lastDate = new Date(year, month + 1, 0).getDate();
+      const prevLastDate = new Date(year, month, 0).getDate();
+
+      // Render Previous Month Padding Days
+      for (let i = firstDay - 1; i >= 0; i--) {
+        const dayNum = prevLastDate - i;
+        const cell = document.createElement('div');
+        cell.className = 'min-h-[90px] sm:min-h-[110px] p-1 sm:p-2 bg-slate-50/50 text-slate-300 text-xs';
+        cell.innerHTML = `<span class="font-medium">${dayNum}</span>`;
+        grid.appendChild(cell);
+      }
+
+      // Render Current Month Days
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      for (let date = 1; date <= lastDate; date++) {
+        const monthStr = String(month + 1).padStart(2, '0');
+        const dateStr = String(date).padStart(2, '0');
+        const formattedDate = `${year}-${monthStr}-${dateStr}`;
+
+        const isToday = formattedDate === todayStr;
+
+        // Filter events for this day
+        const dayEvents = events.filter(e => {
+          if (e.date !== formattedDate) return false;
+          if (currentTeamFilter !== 'all' && e.team !== currentTeamFilter) return false;
+          if (currentFormatFilter !== 'all' && e.format !== currentFormatFilter) return false;
+          return true;
+        });
+
+        // Detect Conflict (Both Team 1 and Team 2 have schedules)
+        const team1Has = dayEvents.some(e => e.team === '1팀');
+        const team2Has = dayEvents.some(e => e.team === '2팀');
+        const hasConflict = team1Has && team2Has;
+
+        const cell = document.createElement('div');
+        cell.className = `min-h-[90px] sm:min-h-[110px] p-1 sm:p-2 bg-white transition hover:bg-slate-50/80 flex flex-col justify-between ${isToday ? 'bg-indigo-50/30 ring-1 ring-indigo-400 inset-0' : ''}`;
+        
+        let cellContent = `
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold ${isToday ? 'bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center' : 'text-slate-700'}">${date}</span>
+              ${hasConflict ? '<span class="text-amber-500 font-bold text-xs" title="1팀과 2팀 일정이 겹침!">⚠️</span>' : ''}
+            </div>
+            <div class="space-y-1">
+        `;
+
+        dayEvents.forEach(ev => {
+          const isTeam1 = ev.team === '1팀';
+          const teamBadgeBg = isTeam1 ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700';
+          const dotBg = isTeam1 ? 'bg-indigo-500' : 'bg-emerald-500';
+          const formatBadge = ev.format === '릴스 콘텐츠' ? '🎬' : '📝';
+
+          cellContent += `
+            <div data-id="${ev.id}" class="event-card group flex items-center justify-between p-1 rounded-md border ${teamBadgeBg} text-[11px] font-medium leading-tight cursor-pointer hover:shadow-xs transition">
+              <div class="truncate flex items-center space-x-1 flex-1 pr-1">
+                <span class="w-1.5 h-1.5 rounded-full ${dotBg} shrink-0"></span>
+                <span class="font-bold text-[10px] opacity-80">${ev.team}</span>
+                <span class="truncate">${ev.title}</span>
+              </div>
+              <div class="flex items-center space-x-1 shrink-0">
+                <span class="text-[10px]">${formatBadge}</span>
+                <button data-id="${ev.id}" class="delete-card-btn opacity-0 group-hover:opacity-100 p-0.5 hover:text-rose-600 text-slate-400 transition">
+                  <i data-lucide="x" class="w-3 h-3"></i>
                 </button>
+              </div>
             </div>
+          `;
+        });
 
-            <!-- Modal Form Body -->
-            <form id="scheduleForm" onsubmit="saveSchedule(event)" class="p-5 sm:p-6 space-y-4">
-                <input type="hidden" id="scheduleId">
+        cellContent += `</div></div>`;
+        
+        // Quick add button
+        cellContent += `
+          <button data-date="${formattedDate}" class="quick-add-btn text-[10px] text-slate-400 hover:text-indigo-600 font-medium py-0.5 text-center w-full opacity-0 hover:opacity-100 transition mt-1">
+            + 일정 추가
+          </button>
+        `;
 
-                <!-- Title Input -->
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">콘텐츠 제목 / 주제 <span class="text-rose-500">*</span></label>
-                    <input type="text" id="formTitle" required placeholder="예: [특집] 9월 가을 신상 기획 룩북" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
+        cell.innerHTML = cellContent;
+        grid.appendChild(cell);
+      }
 
-                <!-- Team & Format Grid -->
-                <div class="grid grid-cols-2 gap-3 sm:gap-4">
-                    <!-- Team Selector -->
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">담당 팀 <span class="text-rose-500">*</span></label>
-                        <select id="formTeam" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                            <option value="TEAM1">1팀 (박지훈 팀장)</option>
-                            <option value="TEAM2">2팀 (김정훈 팀장)</option>
-                        </select>
-                    </div>
-                    <!-- Format Type Selector -->
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">포맷 유형 <span class="text-rose-500">*</span></label>
-                        <select id="formFormat" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                            <option value="기획 콘텐츠">기획 콘텐츠</option>
-                            <option value="릴스 콘텐츠">릴스 콘텐츠</option>
-                        </select>
-                    </div>
-                </div>
+      // Next Month Padding Days
+      const totalCells = firstDay + lastDate;
+      const nextDays = (7 - (totalCells % 7)) % 7;
+      for (let i = 1; i <= nextDays; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'min-h-[90px] sm:min-h-[110px] p-1 sm:p-2 bg-slate-50/50 text-slate-300 text-xs';
+        cell.innerHTML = `<span class="font-medium">${i}</span>`;
+        grid.appendChild(cell);
+      }
+    }
 
-                <!-- Date & Time Grid -->
-                <div class="grid grid-cols-2 gap-3 sm:gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">발행 일자 <span class="text-rose-500">*</span></label>
-                        <input type="date" id="formDate" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">발행 시간 <span class="text-rose-500">*</span></label>
-                        <input type="time" id="formTime" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                </div>
+    // Render Timeline View
+    function renderTimeline() {
+      const timeline = document.getElementById('listTimeline');
+      timeline.innerHTML = '';
 
-                <!-- Status Selector -->
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">진행 상태</label>
-                    <select id="formStatus" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        <option value="기획 중">기획 중</option>
-                        <option value="제작 중">제작 중</option>
-                        <option value="승인 완료">승인 완료</option>
-                        <option value="발행 완료">발행 완료</option>
-                    </select>
-                </div>
+      const filteredEvents = events.filter(e => {
+        if (currentTeamFilter !== 'all' && e.team !== currentTeamFilter) return false;
+        if (currentFormatFilter !== 'all' && e.format !== currentFormatFilter) return false;
+        return true;
+      }).sort((a, b) => new Date(a.date) - new Date(b.date));
 
-                <!-- Notes Input -->
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">비고 및 레퍼런스 링크</label>
-                    <textarea id="formNotes" rows="2" placeholder="참고 링크나 팀원 공유사항을 입력하세요." class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
-                </div>
+      if (filteredEvents.length === 0) {
+        timeline.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">등록된 일정이 없습니다.</div>`;
+        return;
+      }
 
-                <!-- Action Buttons -->
-                <div class="flex justify-between items-center pt-3 border-t border-slate-100">
-                    <button type="button" id="btnDeleteModal" onclick="confirmDeleteFromModal()" class="hidden text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-3 py-2 rounded-xl transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-trash-can"></i> 일정 삭제
-                    </button>
-                    <div class="flex space-x-2 ml-auto">
-                        <button type="button" onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 transition">취소</button>
-                        <button type="submit" id="btnSubmitForm" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm transition">저장하기</button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
+      filteredEvents.forEach(ev => {
+        const isTeam1 = ev.team === '1팀';
+        const teamBadgeBg = isTeam1 ? 'bg-indigo-100 text-indigo-800' : 'bg-emerald-100 text-emerald-800';
 
-    <!-- Delete Confirmation Modal -->
-    <div id="deleteConfirmModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center border border-slate-100 transform transition-all">
-            <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 text-xl">
-                <i class="fa-solid fa-trash-can"></i>
+        const item = document.createElement('div');
+        item.className = 'pt-3 flex items-start justify-between hover:bg-slate-50 p-2 rounded-xl transition';
+        item.innerHTML = `
+          <div class="flex items-start space-x-3">
+            <div class="bg-slate-100 px-2.5 py-1.5 rounded-lg text-center shrink-0">
+              <span class="text-xs font-bold text-slate-700 block">${ev.date.split('-')[1]}.${ev.date.split('-')[2]}</span>
+              <span class="text-[10px] text-slate-400 block">${ev.format}</span>
             </div>
-            <h4 class="text-base sm:text-lg font-bold text-slate-900 mb-1">일정을 삭제하시겠습니까?</h4>
-            <p class="text-xs text-slate-500 mb-6">실시간으로 연동되어 모든 팀원의 화면에서 삭제됩니다.</p>
-            <div class="flex justify-center space-x-3">
-                <button onclick="closeDeleteModal()" class="w-1/2 py-2.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">취소</button>
-                <button id="btnExecuteDelete" onclick="executeDelete()" class="w-1/2 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold shadow-sm transition">삭제하기</button>
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${teamBadgeBg}">${ev.team} (${isTeam1 ? '박지훈' : '김정훈'})</span>
+                <h4 class="text-sm font-bold text-slate-800">${ev.title}</h4>
+              </div>
+              ${ev.memo ? `<p class="text-xs text-slate-500 mt-1">${ev.memo}</p>` : ''}
             </div>
-        </div>
-    </div>
+          </div>
+          <div class="flex items-center space-x-1">
+            <button data-id="${ev.id}" class="edit-timeline-btn p-1.5 text-slate-400 hover:text-indigo-600 rounded-md transition">
+              <i data-lucide="edit-3" class="w-4 h-4"></i>
+            </button>
+            <button data-id="${ev.id}" class="delete-timeline-btn p-1.5 text-slate-400 hover:text-rose-600 rounded-md transition">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
+        `;
+        timeline.appendChild(item);
+      });
+    }
 
-    <!-- Local Storage Implementation (Firebase 없이 로컬 저장소 사용) -->
-    <script>
-        // Global Application State
-        window.schedules = [];
-        window.currentYear = 2026;
-        window.currentMonth = 8; // September (0-indexed)
-        window.currentTeamFilter = 'ALL';
-        window.currentFormatFilter = 'ALL';
-        window.currentView = 'calendar';
-        window.pendingDeleteId = null;
+    // Conflict Check Banner logic
+    function checkConflicts() {
+      const banner = document.getElementById('conflictAlertBanner');
+      const text = document.getElementById('conflictAlertText');
 
-        // Default initial data
-        const defaultSchedules = [
-            {
-                title: '9월 FW 트렌드 컬러 가이드',
-                team: 'TEAM1',
-                format: '기획 콘텐츠',
-                date: '2026-09-18',
-                time: '18:00',
-                status: '제작 중',
-                notes: '이미지 10장 가로 카드뉴스 형태'
-            },
-            {
-                title: '성수동 핫플 카페 TOP 5',
-                team: 'TEAM2',
-                format: '릴스 콘텐츠',
-                date: '2026-09-18',
-                time: '20:00',
-                status: '승인 완료',
-                notes: '숏폼 30초 음원 저작권 확인 완료'
-            },
-            {
-                title: '에디터 픽 가을 데일리룩 인터뷰',
-                team: 'TEAM1',
-                format: '릴스 콘텐츠',
-                date: '2026-09-22',
-                time: '19:00',
-                status: '기획 중',
-                notes: '현장 인터뷰 영상 편집 예정'
-            },
-            {
-                title: '인디 브랜드 디자이너 스토리',
-                team: 'TEAM2',
-                format: '기획 콘텐츠',
-                date: '2026-09-22',
-                time: '18:00',
-                status: '제작 중',
-                notes: '서면 인터뷰 자료 수집 완료'
-            }
-        ];
+      const dateMap = {};
+      events.forEach(e => {
+        if (!dateMap[e.date]) dateMap[e.date] = new Set();
+        dateMap[e.date].add(e.team);
+      });
 
-        // Initialize App
-        window.onload = function() {
-            loadSchedules();
-            updateMonthLabel();
-            renderView();
-            document.getElementById('syncBadge').classList.remove('hidden');
-        };
+      const conflictDates = Object.keys(dateMap).filter(d => dateMap[d].size > 1);
 
-        // Load from Local Storage
-        function loadSchedules() {
-            const stored = localStorage.getItem('schedules');
-            if (stored) {
-                try {
-                    window.schedules = JSON.parse(stored);
-                } catch (e) {
-                    window.schedules = defaultSchedules.map((item, idx) => ({ ...item, id: 'default-' + idx }));
-                }
-            } else {
-                window.schedules = defaultSchedules.map((item, idx) => ({ ...item, id: 'default-' + idx }));
-                saveSchedules();
-            }
+      if (conflictDates.length > 0) {
+        banner.classList.remove('hidden');
+        text.textContent = `이번 달 ${conflictDates.join(', ')} 에 1팀과 2팀의 발행 일정이 상충하고 있습니다. 일정을 조정하세요!`;
+      } else {
+        banner.classList.add('hidden');
+      }
+    }
+
+    // Modal Control & Event Listeners
+    function setupEventListeners() {
+      const modal = document.getElementById('eventModal');
+      const deleteModal = document.getElementById('deleteConfirmModal');
+      const form = document.getElementById('eventForm');
+
+      // Open Modal for New Event
+      document.getElementById('openModalBtn').addEventListener('click', () => {
+        openModal();
+      });
+
+      // Event Card Clicks & Actions
+      document.addEventListener('click', (e) => {
+        const qAdd = e.target.closest('.quick-add-btn');
+        if (qAdd) {
+          const date = qAdd.dataset.date;
+          openModal(null, date);
+          return;
         }
 
-        // Save to Local Storage
-        function saveSchedules() {
-            localStorage.setItem('schedules', JSON.stringify(window.schedules));
+        const card = e.target.closest('.event-card');
+        const deleteBtn = e.target.closest('.delete-card-btn');
+
+        if (deleteBtn) {
+          e.stopPropagation();
+          const id = deleteBtn.dataset.id;
+          confirmDelete(id);
+          return;
         }
 
-        // Global UI Functions
-        window.showToast = function(message, type = 'success') {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = `pointer-events-auto flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-xs font-semibold text-white transition-all transform translate-y-2 opacity-0 ${type === 'danger' ? 'bg-rose-600' : 'bg-slate-900'}`;
-            toast.innerHTML = `
-                <i class="fa-solid ${type === 'danger' ? 'fa-triangle-exclamation' : 'fa-circle-check'} text-sm"></i>
-                <span>${message}</span>
-            `;
-            container.appendChild(toast);
-
-            setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
-            setTimeout(() => {
-                toast.classList.add('opacity-0');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        };
-
-        window.shareLink = function() {
-            const currentUrl = window.location.href;
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(currentUrl).then(() => {
-                    showToast("스케쥴러 공유 링크가 복사되었습니다! 팀원들에게 전달하세요.");
-                }).catch(() => fallbackCopy(currentUrl));
-            } else {
-                fallbackCopy(currentUrl);
-            }
-        };
-
-        function fallbackCopy(text) {
-            const input = document.createElement('input');
-            input.value = text;
-            document.body.appendChild(input);
-            input.select();
-            document.execCommand('copy');
-            document.body.removeChild(input);
-            showToast("스케쥴러 공유 링크가 복사되었습니다!");
+        if (card) {
+          const id = card.dataset.id;
+          const ev = events.find(item => item.id === id);
+          if (ev) openModal(ev);
+          return;
         }
 
-        window.switchView = function(view) {
-            window.currentView = view;
-            const btnCal = document.getElementById('btnViewCalendar');
-            const btnList = document.getElementById('btnViewList');
-            const viewCal = document.getElementById('calendarView');
-            const viewList = document.getElementById('listView');
+        const editTimelineBtn = e.target.closest('.edit-timeline-btn');
+        const deleteTimelineBtn = e.target.closest('.delete-timeline-btn');
 
-            if (view === 'calendar') {
-                viewCal.classList.remove('hidden');
-                viewList.classList.add('hidden');
-                btnCal.className = "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-white text-slate-800 shadow-sm transition";
-                btnList.className = "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition";
-            } else {
-                viewCal.classList.add('hidden');
-                viewList.classList.remove('hidden');
-                btnList.className = "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-white text-slate-800 shadow-sm transition";
-                btnCal.className = "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition";
-            }
-            renderView();
-        };
-
-        window.setTeamFilter = function(team) {
-            window.currentTeamFilter = team;
-            ['ALL', 'TEAM1', 'TEAM2'].forEach(t => {
-                const btn = document.getElementById(`filterTeam${t === 'ALL' ? 'All' : t === 'TEAM1' ? '1' : '2'}`);
-                if (t === team) {
-                    btn.className = "px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 text-white transition";
-                } else {
-                    btn.className = "px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition";
-                }
-            });
-            renderView();
-        };
-
-        window.applyFilters = function() {
-            window.currentFormatFilter = document.getElementById('formatFilter').value;
-            renderView();
-        };
-
-        window.changeMonth = function(delta) {
-            window.currentMonth += delta;
-            if (window.currentMonth < 0) {
-                window.currentMonth = 11;
-                window.currentYear--;
-            } else if (window.currentMonth > 11) {
-                window.currentMonth = 0;
-                window.currentYear++;
-            }
-            updateMonthLabel();
-            renderView();
-        };
-
-        function updateMonthLabel() {
-            document.getElementById('currentMonthLabel').textContent = `${window.currentYear}년 ${window.currentMonth + 1}월`;
+        if (editTimelineBtn) {
+          const id = editTimelineBtn.dataset.id;
+          const ev = events.find(item => item.id === id);
+          if (ev) openModal(ev);
         }
 
-        function getFilteredSchedules() {
-            return (window.schedules || []).filter(item => {
-                if (!item.date) return false;
-                const itemDate = new Date(item.date);
-                const matchesMonth = itemDate.getFullYear() === window.currentYear && itemDate.getMonth() === window.currentMonth;
-                const matchesTeam = window.currentTeamFilter === 'ALL' || item.team === window.currentTeamFilter;
-                const matchesFormat = window.currentFormatFilter === 'ALL' || item.format === window.currentFormatFilter;
-                return matchesMonth && matchesTeam && matchesFormat;
-            });
+        if (deleteTimelineBtn) {
+          const id = deleteTimelineBtn.dataset.id;
+          confirmDelete(id);
+        }
+      });
+
+      // Close Modal Actions
+      document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+      document.getElementById('cancelModalBtn').addEventListener('click', closeModal);
+
+      // Save Form
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('eventId').value;
+        const eventData = {
+          title: document.getElementById('eventTitle').value,
+          team: document.getElementById('eventTeam').value,
+          format: document.getElementById('eventFormat').value,
+          date: document.getElementById('eventDate').value,
+          memo: document.getElementById('eventMemo').value
+        };
+
+        if (id) {
+          try {
+            await updateDoc(doc(db, "front_office_events", id), eventData);
+          } catch (err) {
+            const idx = events.findIndex(item => item.id === id);
+            if (idx !== -1) events[idx] = { id, ...eventData };
+            saveBackupData(events);
+            render();
+          }
+          showToast('일정이 수정되었습니다.');
+        } else {
+          try {
+            await addDoc(eventsCol, eventData);
+          } catch (err) {
+            const newEv = { id: 'local_' + Date.now(), ...eventData };
+            events.push(newEv);
+            saveBackupData(events);
+            render();
+          }
+          showToast('새 일정이 등록되었습니다.');
         }
 
-        window.renderView = function() {
-            const filtered = getFilteredSchedules();
-            document.getElementById('totalCount').textContent = filtered.length;
+        closeModal();
+      });
 
-            checkScheduleConflicts();
-
-            if (window.currentView === 'calendar') {
-                renderCalendar(filtered);
-            } else {
-                renderList(filtered);
-            }
-        };
-
-        function checkScheduleConflicts() {
-            const dateMap = {};
-            (window.schedules || []).forEach(s => {
-                if (!s.date) return;
-                if (!dateMap[s.date]) dateMap[s.date] = new Set();
-                dateMap[s.date].add(s.team);
-            });
-
-            const conflictDates = Object.keys(dateMap).filter(d => dateMap[d].size > 1);
-            const banner = document.getElementById('conflictAlertBanner');
-            const alertText = document.getElementById('conflictAlertText');
-
-            if (conflictDates.length > 0) {
-                const formattedDates = conflictDates.map(d => {
-                    const parts = d.split('-');
-                    return `${parts[1]}월 ${parts[2]}일`;
-                }).join(', ');
-                alertText.innerHTML = `<strong>${formattedDates}</strong>에 1팀(박지훈)과 2팀(김정훈)의 콘텐츠 발행 일정이 동일 날짜에 배치되어 있습니다. 발행 시간을 점검해주세요!`;
-                banner.classList.remove('hidden');
-            } else {
-                banner.classList.add('hidden');
-            }
+      // Delete in Edit Modal
+      document.getElementById('deleteModalEventBtn').addEventListener('click', () => {
+        const id = document.getElementById('eventId').value;
+        if (id) {
+          closeModal();
+          confirmDelete(id);
         }
+      });
 
-        function renderCalendar(filteredItems) {
-            const grid = document.getElementById('calendarGrid');
-            grid.innerHTML = '';
+      // Delete Confirm Actions
+      document.getElementById('cancelDeleteBtn').addEventListener('click', () => {
+        deleteModal.classList.add('hidden');
+        pendingDeleteId = null;
+      });
 
-            const firstDay = new Date(window.currentYear, window.currentMonth, 1).getDay();
-            const daysInMonth = new Date(window.currentYear, window.currentMonth + 1, 0).getDate();
-
-            for (let i = 0; i < firstDay; i++) {
-                const emptyCell = document.createElement('div');
-                emptyCell.className = 'bg-slate-50/40 p-1 sm:p-2 min-h-[70px] sm:min-h-[110px]';
-                grid.appendChild(emptyCell);
-            }
-
-            for (let day = 1; day <= daysInMonth; day++) {
-                const dateStr = `${window.currentYear}-${String(window.currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const dayItems = filteredItems.filter(item => item.date === dateStr);
-
-                const allTeamsOnDate = (window.schedules || []).filter(s => s.date === dateStr).map(s => s.team);
-                const isConflict = allTeamsOnDate.includes('TEAM1') && allTeamsOnDate.includes('TEAM2');
-
-                const cell = document.createElement('div');
-                cell.className = `p-1 sm:p-2 min-h-[70px] sm:min-h-[110px] flex flex-col justify-between transition hover:bg-slate-50 ${isConflict ? 'bg-amber-50/50' : ''}`;
-
-                let cellHeaderHtml = `
-                    <div class="flex justify-between items-center mb-1">
-                        <span class="text-[11px] sm:text-xs font-bold ${new Date(dateStr).getDay() === 0 ? 'text-rose-500' : new Date(dateStr).getDay() === 6 ? 'text-indigo-500' : 'text-slate-700'}">${day}</span>
-                        ${isConflict ? '<span class="text-[9px] sm:text-[10px] font-bold bg-amber-100 text-amber-800 px-1 py-0.2 rounded flex items-center gap-0.5" title="일정 중복 경고"><i class="fa-solid fa-triangle-exclamation text-amber-600"></i><span class="hidden sm:inline">중복</span></span>' : ''}
-                    </div>
-                `;
-
-                let itemsHtml = '<div class="space-y-1 overflow-y-auto max-h-[85px] custom-scrollbar flex-1">';
-                dayItems.sort((a,b) => (a.time || '').localeCompare(b.time || '')).forEach(item => {
-                    const isTeam1 = item.team === 'TEAM1';
-                    const badgeBg = isTeam1 ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-teal-50 text-teal-700 border-teal-200';
-                    const icon = item.format === '릴스 콘텐츠' ? 'fa-clapperboard' : 'fa-file-lines';
-
-                    itemsHtml += `
-                        <div onclick="editSchedule('${item.id}')" class="group relative p-1 sm:p-1.5 rounded-lg border text-[11px] cursor-pointer hover:shadow-sm transition ${badgeBg}">
-                            <div class="flex items-center justify-between font-bold text-[10px] sm:text-[11px] leading-tight">
-                                <span class="truncate">${isTeam1 ? '1팀' : '2팀'} • ${item.time || ''}</span>
-                                <div class="flex items-center space-x-1">
-                                    <i class="fa-solid ${icon} text-[9px] opacity-75"></i>
-                                    <button onclick="event.stopPropagation(); promptDelete('${item.id}');" class="opacity-0 group-hover:opacity-100 text-rose-500 hover:text-rose-700 p-0.5 transition" title="삭제">
-                                        <i class="fa-solid fa-trash-can text-[9px]"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="font-medium text-[10px] sm:text-[11px] truncate mt-0.5 pr-2 hidden sm:block">${item.title}</div>
-                        </div>
-                    `;
-                });
-                itemsHtml += '</div>';
-
-                cell.innerHTML = cellHeaderHtml + itemsHtml;
-                grid.appendChild(cell);
-            }
+      document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+        if (pendingDeleteId) {
+          try {
+            await deleteDoc(doc(db, "front_office_events", pendingDeleteId));
+          } catch (err) {
+            events = events.filter(item => item.id !== pendingDeleteId);
+            saveBackupData(events);
+            render();
+          }
+          showToast('일정이 삭제되었습니다.');
         }
+        deleteModal.classList.add('hidden');
+        pendingDeleteId = null;
+      });
 
-        function renderList(filteredItems) {
-            const tbody = document.getElementById('listTableBody');
-            tbody.innerHTML = '';
+      // Navigation Buttons
+      document.getElementById('prevMonth').addEventListener('click', () => {
+        currentDate.setMonth(currentDate.getMonth() - 1);
+        render();
+      });
+      document.getElementById('nextMonth').addEventListener('click', () => {
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        render();
+      });
+      document.getElementById('todayBtn').addEventListener('click', () => {
+        currentDate = new Date();
+        render();
+      });
 
-            if (filteredItems.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400">등록된 일정이 없습니다.</td></tr>`;
-                return;
-            }
+      // Team Filters
+      document.querySelectorAll('.filter-team-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          document.querySelectorAll('.filter-team-btn').forEach(b => {
+            b.classList.remove('bg-white', 'text-slate-800', 'shadow-xs');
+            b.classList.add('hover:text-slate-900');
+          });
+          e.target.classList.add('bg-white', 'text-slate-800', 'shadow-xs');
+          currentTeamFilter = e.target.dataset.team;
+          render();
+        });
+      });
 
-            filteredItems.sort((a,b) => (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || '')).forEach(item => {
-                const isTeam1 = item.team === 'TEAM1';
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+      // Format Filters
+      document.querySelectorAll('.filter-format-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          document.querySelectorAll('.filter-format-btn').forEach(b => {
+            b.classList.remove('bg-white', 'text-slate-800', 'shadow-xs');
+            b.classList.add('hover:text-slate-900');
+          });
+          e.target.classList.add('bg-white', 'text-slate-800', 'shadow-xs');
+          currentFormatFilter = e.target.dataset.format;
+          render();
+        });
+      });
 
-                let statusBadgeClass = 'bg-slate-100 text-slate-600';
-                if (item.status === '승인 완료') statusBadgeClass = 'bg-blue-100 text-blue-700';
-                if (item.status === '발행 완료') statusBadgeClass = 'bg-emerald-100 text-emerald-700';
-                if (item.status === '제작 중') statusBadgeClass = 'bg-purple-100 text-purple-700';
+      // View Toggle
+      document.getElementById('calendarViewBtn').addEventListener('click', () => {
+        currentView = 'calendar';
+        document.getElementById('calendarContainer').classList.remove('hidden');
+        document.getElementById('listContainer').classList.add('hidden');
+        document.getElementById('calendarViewBtn').classList.add('bg-white', 'text-slate-800', 'shadow-xs');
+        document.getElementById('listViewBtn').classList.remove('bg-white', 'text-slate-800', 'shadow-xs');
+        render();
+      });
 
-                tr.innerHTML = `
-                    <td class="p-3.5 font-semibold text-slate-700">${item.date} <span class="text-xs text-slate-400">(${item.time})</span></td>
-                    <td class="p-3.5">
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${isTeam1 ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-teal-50 text-teal-700 border border-teal-200'}">
-                            <span class="w-1.5 h-1.5 rounded-full ${isTeam1 ? 'bg-indigo-600' : 'bg-teal-600'}"></span>
-                            ${isTeam1 ? '1팀 (박지훈)' : '2팀 (김정훈)'}
-                        </span>
-                    </td>
-                    <td class="p-3.5">
-                        <span class="inline-flex items-center gap-1 text-xs font-medium text-slate-600">
-                            <i class="fa-solid ${item.format === '릴스 콘텐츠' ? 'fa-clapperboard text-pink-500' : 'fa-file-lines text-blue-500'}"></i>
-                            ${item.format}
-                        </span>
-                    </td>
-                    <td class="p-3.5 font-bold text-slate-900">${item.title}</td>
-                    <td class="p-3.5">
-                        <span class="px-2 py-1 rounded-md text-xs font-semibold ${statusBadgeClass}">${item.status}</span>
-                    </td>
-                    <td class="p-3.5 text-xs text-slate-500 truncate max-w-[150px]">${item.notes || '-'}</td>
-                    <td class="p-3.5 text-right space-x-1">
-                        <button onclick="editSchedule('${item.id}')" class="p-1.5 text-slate-400 hover:text-indigo-600 transition" title="수정"><i class="fa-solid fa-pen-to-square"></i></button>
-                        <button onclick="promptDelete('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-600 transition" title="삭제"><i class="fa-solid fa-trash-can"></i></button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
+      document.getElementById('listViewBtn').addEventListener('click', () => {
+        currentView = 'list';
+        document.getElementById('calendarContainer').classList.add('hidden');
+        document.getElementById('listContainer').classList.remove('hidden');
+        document.getElementById('listViewBtn').classList.add('bg-white', 'text-slate-800', 'shadow-xs');
+        document.getElementById('calendarViewBtn').classList.remove('bg-white', 'text-slate-800', 'shadow-xs');
+        render();
+      });
 
-        window.openModal = function(isEdit = false) {
-            const btnDeleteModal = document.getElementById('btnDeleteModal');
-            if (!isEdit) {
-                document.getElementById('scheduleForm').reset();
-                document.getElementById('scheduleId').value = '';
-                document.getElementById('modalTitle').textContent = '새 콘텐츠 일정 추가';
-                document.getElementById('formDate').value = `${window.currentYear}-${String(window.currentMonth + 1).padStart(2, '0')}-15`;
-                document.getElementById('formTime').value = '18:00';
-                btnDeleteModal.classList.add('hidden');
-            } else {
-                btnDeleteModal.classList.remove('hidden');
-            }
-            document.getElementById('scheduleModal').classList.remove('hidden');
-        };
+      // Share Link Button
+      document.getElementById('shareBtn').addEventListener('click', () => {
+        navigator.clipboard.writeText(window.location.href).then(() => {
+          showToast('페이지 링크가 클립보드에 복사되었습니다!');
+        }).catch(() => {
+          showToast('링크 복사에 실패했습니다.');
+        });
+      });
+    }
 
-        window.closeModal = function() {
-            document.getElementById('scheduleModal').classList.add('hidden');
-        };
+    function openModal(eventObj = null, defaultDate = null) {
+      const modal = document.getElementById('eventModal');
+      const deleteBtn = document.getElementById('deleteModalEventBtn');
+      const modalTitle = document.getElementById('modalTitle');
 
-        window.editSchedule = function(id) {
-            const item = (window.schedules || []).find(s => s.id === id);
-            if (!item) return;
+      if (eventObj) {
+        modalTitle.textContent = '콘텐츠 일정 수정';
+        document.getElementById('eventId').value = eventObj.id;
+        document.getElementById('eventTitle').value = eventObj.title;
+        document.getElementById('eventTeam').value = eventObj.team;
+        document.getElementById('eventFormat').value = eventObj.format;
+        document.getElementById('eventDate').value = eventObj.date;
+        document.getElementById('eventMemo').value = eventObj.memo || '';
+        deleteBtn.classList.remove('hidden');
+        deleteBtn.classList.add('flex');
+      } else {
+        modalTitle.textContent = '새 콘텐츠 일정 추가';
+        document.getElementById('eventForm').reset();
+        document.getElementById('eventId').value = '';
+        document.getElementById('eventDate').value = defaultDate || new Date().toISOString().split('T')[0];
+        deleteBtn.classList.add('hidden');
+        deleteBtn.classList.remove('flex');
+      }
 
-            document.getElementById('scheduleId').value = item.id;
-            document.getElementById('formTitle').value = item.title;
-            document.getElementById('formTeam').value = item.team;
-            document.getElementById('formFormat').value = item.format;
-            document.getElementById('formDate').value = item.date;
-            document.getElementById('formTime').value = item.time;
-            document.getElementById('formStatus').value = item.status;
-            document.getElementById('formNotes').value = item.notes || '';
+      modal.classList.remove('hidden');
+    }
 
-            document.getElementById('modalTitle').textContent = '콘텐츠 일정 수정';
-            openModal(true);
-        };
+    function closeModal() {
+      document.getElementById('eventModal').classList.add('hidden');
+    }
 
-        window.saveSchedule = function(e) {
-            e.preventDefault();
-            const btnSubmit = document.getElementById('btnSubmitForm');
-            btnSubmit.disabled = true;
-            btnSubmit.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 저장 중...`;
+    function confirmDelete(id) {
+      pendingDeleteId = id;
+      document.getElementById('deleteConfirmModal').classList.remove('hidden');
+    }
 
-            const id = document.getElementById('scheduleId').value;
-            const payload = {
-                title: document.getElementById('formTitle').value.trim(),
-                team: document.getElementById('formTeam').value,
-                format: document.getElementById('formFormat').value,
-                date: document.getElementById('formDate').value,
-                time: document.getElementById('formTime').value,
-                status: document.getElementById('formStatus').value,
-                notes: document.getElementById('formNotes').value.trim(),
-            };
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2500);
+    }
 
-            try {
-                if (id) {
-                    // Update existing
-                    const index = window.schedules.findIndex(s => s.id === id);
-                    if (index !== -1) {
-                        window.schedules[index] = { ...window.schedules[index], ...payload };
-                        showToast('일정이 수정되었습니다.');
-                    }
-                } else {
-                    // Add new
-                    const newId = 'schedule-' + Date.now();
-                    window.schedules.push({ id: newId, ...payload });
-                    showToast('새 일정이 추가되었습니다!');
-                }
-                saveSchedules();
-                closeModal();
-                renderView();
-            } catch (err) {
-                console.error("Save error:", err);
-                showToast("저장하는 중 오류가 발생했습니다.", "danger");
-            } finally {
-                btnSubmit.disabled = false;
-                btnSubmit.innerHTML = '저장하기';
-            }
-        };
-
-        window.promptDelete = function(id) {
-            window.pendingDeleteId = id;
-            document.getElementById('deleteConfirmModal').classList.remove('hidden');
-        };
-
-        window.confirmDeleteFromModal = function() {
-            const id = document.getElementById('scheduleId').value;
-            if (id) {
-                closeModal();
-                promptDelete(id);
-            }
-        };
-
-        window.closeDeleteModal = function() {
-            window.pendingDeleteId = null;
-            document.getElementById('deleteConfirmModal').classList.add('hidden');
-        };
-
-        window.executeDelete = function() {
-            if (!window.pendingDeleteId) return;
-
-            const btnDel = document.getElementById('btnExecuteDelete');
-            btnDel.disabled = true;
-
-            try {
-                window.schedules = window.schedules.filter(s => s.id !== window.pendingDeleteId);
-                saveSchedules();
-                showToast('일정이 삭제되었습니다.', 'danger');
-                closeDeleteModal();
-                renderView();
-            } catch (err) {
-                console.error("Delete error:", err);
-                showToast("삭제 중 오류가 발생했습니다.", "danger");
-            } finally {
-                btnDel.disabled = false;
-            }
-        };
-    </script>
+    // App Init
+    window.addEventListener('DOMContentLoaded', initApp);
+  </script>
 </body>
 </html>
